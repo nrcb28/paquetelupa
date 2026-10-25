@@ -4,6 +4,7 @@
 
 - Añadida localización de una entrada por ID con `--locate`, revelando solo su nombre en JSON. No inspecciona el contenido ni extrae archivos; es incompatible con HTML y con la divulgación de todos los nombres.
 - Añadida identidad SHA-256 del ZIP en informes y localizaciones. `--expect-sha256` rechaza archivos diferentes antes de revelar nombres. La huella no es una firma ni una garantía de seguridad.
+- Se recalcula SHA-256 al finalizar sobre un descriptor sin caché de lectura, para detectar cambios persistentes que las fechas de Windows pueden ocultar. Se mantiene el requisito de conservar estables el archivo y su carpeta.
 - Rechazadas rutas Windows con ADS, dispositivos, nombres reservados, UNC, referencias relativas a una unidad y formas ambiguas, tanto para entrada como para salida.
 - Las salidas nuevas se crean exclusivamente y se comprueba que sean archivos regulares. Se solicita modo `0600` en POSIX; Windows conserva las ACL heredadas de la carpeta.
 - El supervisor aplica un plazo también a la recepción completa por IPC; se evita una espera sin límite si el mensaje queda a medias. Se mantiene la terminación y limpieza del proceso y del receptor.

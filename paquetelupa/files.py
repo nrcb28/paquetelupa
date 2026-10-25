@@ -40,7 +40,9 @@ def open_regular_input(path):
     flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
     descriptor = os.open(input_path, flags)
     try:
-        stream = os.fdopen(descriptor, "rb")
+        # Revalidation must read fresh descriptor bytes rather than a cached
+        # BufferedReader window after a same-size concurrent rewrite.
+        stream = os.fdopen(descriptor, "rb", buffering=0)
     except BaseException:
         os.close(descriptor)
         raise

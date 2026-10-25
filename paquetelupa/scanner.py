@@ -408,6 +408,11 @@ def scan_file(path: str | Path, limits: Limits | None = None, show_paths: bool =
             after = os.fstat(stream.fileno())
             if (before.st_size, before.st_mtime_ns, before.st_ctime_ns) != (after.st_size, after.st_mtime_ns, after.st_ctime_ns):
                 raise Rejected("El archivo cambió durante el análisis; resultado no fiable.")
+            # st_ctime is creation time on some Windows/Python combinations;
+            # do not rely on it to detect same-size rewrites with restored mtime.
+            if _fingerprint(stream, before.st_size, limits, check)["sha256"] != report["archive"]["sha256"]:
+                raise Rejected("Los bytes del ZIP cambiaron durante el análisis.")
+            assert_unchanged(stream, before)
         except (Rejected, zlib.error, struct.error, UnicodeError) as error:
             report["complete"] = False
             message = str(error) if isinstance(error, Rejected) else "Error de estructura o descompresión ZIP."
@@ -442,6 +447,8 @@ def locate_entry(path, entry_id, limits=None, *, expected_sha256=None):
         selected = next((entry for entry in entries if entry["id"] == entry_id), None)
         if selected is None:
             raise SelectionNotFound("El identificador solicitado no existe en este ZIP.")
+        if _fingerprint(stream, before.st_size, limits, check)["sha256"] != identity["sha256"]:
+            raise OSError("Los bytes del ZIP cambiaron durante la localización.")
         assert_unchanged(stream, before)
         return dict(schema_version="1.0", tool=dict(name="PaqueteLupa", version=__version__),
                     operation="locate", archive=identity,

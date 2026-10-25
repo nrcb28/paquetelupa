@@ -131,6 +131,44 @@ class ParserCoverageV011Tests(unittest.TestCase):
             with self.assertRaises(OSError):
                 scanner.locate_entry(self.source, "entrada-00001", expected_sha256=expected)
 
+    def mutate_after_hash_with_constant_metadata(self, operation):
+        """Model platforms whose size/mtime/ctime do not expose a rewrite.
+
+        The ZIP is intentionally smaller than a BufferedReader cache, so the
+        guard must reread the descriptor rather than rehash cached old bytes.
+        """
+        original = synthetic_zip(name=b"safe.txt")
+        modified = original.replace(b"safe.txt", b"evil.txt")
+        self.assertNotEqual(original, modified)
+        self.assertEqual(len(original), len(modified))
+        self.source.write_bytes(original)
+        with self.source.open("rb") as stream:
+            stable_metadata = os.fstat(stream.fileno())
+        real_directory = scanner._directory
+
+        def mutate(stream, *args, **kwargs):
+            self.source.write_bytes(modified)
+            return real_directory(stream, *args, **kwargs)
+
+        with patch.object(scanner.os, "fstat", return_value=stable_metadata):
+            with patch.object(scanner, "_directory", side_effect=mutate):
+                return operation(hashlib.sha256(original).hexdigest())
+
+    def test_locator_rejects_different_bytes_when_all_fstat_metadata_is_identical(self):
+        def operation(expected):
+            with self.assertRaises(OSError):
+                scanner.locate_entry(self.source, "entrada-00001", expected_sha256=expected)
+
+        self.mutate_after_hash_with_constant_metadata(operation)
+
+    def test_scan_is_incomplete_for_different_bytes_with_identical_fstat_metadata(self):
+        def operation(expected):
+            result = scanner.scan_file(self.source, expected_sha256=expected)
+            self.assertFalse(result["complete"])
+            self.assertEqual(result["status"], "incomplete")
+
+        self.mutate_after_hash_with_constant_metadata(operation)
+
     def test_wrong_expected_identity_fails_before_any_directory_interpretation(self):
         self.source.write_bytes(synthetic_zip())
         with patch.object(scanner, "_directory", side_effect=AssertionError("Directory must not be interpreted")):

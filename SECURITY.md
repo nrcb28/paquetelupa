@@ -6,6 +6,8 @@ PaqueteLupa revisa ZIP de soporte no confiables y produce información para una 
 
 Los nombres, metadatos y bytes del ZIP se consideran no confiables. El analizador abre un archivo regular para lectura y conserva un descriptor durante la revisión. Rechaza enlaces/puntos de reanálisis en la entrada cuando puede detectarlos y comprueba cambios observables durante la lectura. El usuario debe mantener el archivo y su carpeta estables mientras se analiza; estas comprobaciones no sustituyen el aislamiento frente a un proceso local hostil.
 
+El descriptor se lee sin caché de `BufferedReader`. Se calcula SHA-256 antes y después de inspeccionar o localizar, además de comparar metadatos, para detectar reescrituras persistentes del mismo tamaño aunque se restaure `mtime` o `ctime` represente creación en Windows. Es una comprobación de estabilidad; no es una instantánea inmutable ni protege frente a cambios posteriores o a un proceso hostil que restaure bytes entre lecturas.
+
 No se extraen miembros del ZIP al sistema de archivos, no se ejecutan programas del paquete y no se envían datos por red. No se siguen destinos de enlaces del archivo. Las rutas peligrosas se notifican para prevenir un uso posterior inseguro del paquete; la herramienta no convierte un ZIP peligroso en uno apto para extraer.
 
 La salida contiene solo metadatos y consejos constantes. Los IDs ordinales permiten relacionar hallazgos con el orden central sin publicar nombres. `--show-paths` incluye todos los nombres internos por solicitud del usuario; `--locate` revela solo el nombre seleccionado. Ambos pueden revelar personas, proyectos o credenciales. Ni el nombre del ZIP de entrada ni los de los archivos de informe se insertan automáticamente como título del reporte.
