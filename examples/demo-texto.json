@@ -1,0 +1,45 @@
+{
+  "schema_version": "1.0",
+  "tool": {
+    "name": "PaqueteLupa",
+    "version": "0.2.0"
+  },
+  "status": "no_findings",
+  "complete": true,
+  "summary": {
+    "entries": 1,
+    "scanned_text_files": 1,
+    "skipped_files": 0,
+    "bytes_read": 47,
+    "findings": 0
+  },
+  "limits": {
+    "archive_bytes": 67108864,
+    "central_bytes": 2097152,
+    "entries": 2000,
+    "entry_bytes": 8388608,
+    "total_bytes": 33554432,
+    "ratio": 100,
+    "seconds": 20,
+    "findings": 500
+  },
+  "findings": [],
+  "entries": [
+    {
+      "id": "entrada-00001",
+      "size": 47,
+      "compressed_size": 46,
+      "state": "scanned"
+    }
+  ],
+  "notes": [
+    "Inspecci\u00f3n local: no extrae, ejecuta ni env\u00eda contenidos.",
+    "Sin hallazgos no significa seguro. Detecci\u00f3n por patrones; no es un antivirus ni una anonimizaci\u00f3n.",
+    "Nombres omitidos por privacidad; los identificadores siguen el orden del directorio central.",
+    "Se revisan texto, nombres y comentarios ZIP. Fechas y UID/GID reconocidos se validan estructuralmente; otros campos extra dejan cobertura incompleta."
+  ],
+  "archive": {
+    "sha256": "379c2adbac2cc9d4f1166ed5e9386c6d96031339726680ea57d62d61acf817e9",
+    "size_bytes": 164
+  }
+}

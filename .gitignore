@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+CONTINUITY.md
+informes/
+dist/
+*.pyz
+*.zip
+*.json
+!.release-manifest.json
+*.html
+!examples/*.zip
+!examples/*.json
+!examples/*.html
+.DS_Store

@@ -1,0 +1,34 @@
+{
+  "seed": 20261027,
+  "requested_mutations": 5000,
+  "requested_valid_zip_cases": 100,
+  "completed_cases": 5104,
+  "passed": true,
+  "sentinel_bearing_cases": 2130,
+  "invariants": {
+    "no_unexpected_exception": true,
+    "status_complete_consistent": true,
+    "input_unchanged": true,
+    "no_extraction_in_fixture_directory": true,
+    "no_sentinel_in_default_report": true
+  },
+  "benchmarks": [
+    {
+      "duration_seconds": 3.218,
+      "status": "no_findings",
+      "complete": true,
+      "expanded_bytes": 8388608,
+      "archive_bytes": 8388736
+    },
+    {
+      "duration_seconds": 13.203,
+      "status": "no_findings",
+      "complete": true,
+      "expanded_bytes": 33554432,
+      "archive_bytes": 33554878
+    }
+  ],
+  "limitation": "Prueba reproducible con datos sint\u00e9ticos; no demuestra seguridad exhaustiva.",
+  "duration_seconds": 23.063,
+  "supervised_duration_seconds": 23.281
+}

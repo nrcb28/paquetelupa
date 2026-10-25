@@ -1,0 +1,36 @@
+{
+  "date": "2026-10-25",
+  "version": "0.1.0",
+  "python": "3.12.14",
+  "platform": "Windows",
+  "tests": {
+    "run": 148,
+    "passed": 147,
+    "skipped": 1,
+    "failures": 0,
+    "errors": 0,
+    "duration_seconds": 8.156,
+    "skipped_reasons": [
+      "Creating symlinks is unavailable on this platform/account"
+    ]
+  },
+  "source_sha256": {
+    "paquetelupa/__init__.py": "39c79e5acbb5a573a9d5762bb2b3289bdaef9897ef0407dcc65deb041d00d2d6",
+    "paquetelupa/__main__.py": "82028ad91bcf667ce52dd39a287e846714440ea75c007b5ad4b0c7863218cf06",
+    "paquetelupa/detectors.py": "71350d66d59dbf765eded24b1b028dff9d93453593646d1fafa5d5a9991bebfa",
+    "paquetelupa/reports.py": "b4f7dbbf7c10ceec2d04386f2d903c4bed9f79163b50ca5039be13633b57b6d0",
+    "paquetelupa/runtime.py": "b736d2e6e788ff434a60a0916b2bac452d561d31341a5b084436655dcc255cef",
+    "paquetelupa/scanner.py": "2bb934e7a67f0e8b97870e1790b17d3915f00a2a50c4615b14f4499aaadf6304"
+  },
+  "fuzz_evidence": [
+    "examples/fuzz-20261025.json",
+    "examples/fuzz-final-20261025.json",
+    "examples/fuzz-final-pathfix-20261025.json"
+  ],
+  "limitations": [
+    "Datos sint\u00e9ticos; no certifica seguridad ni ausencia de secretos.",
+    "Python 3.12.14 en Windows; otros runtimes no ejecutados.",
+    "Sin sandbox ni cuota estricta de memoria del sistema operativo.",
+    "HTML comprobado autom\u00e1ticamente; vista previa local bloqueada por pol\u00edtica del navegador."
+  ]
+}

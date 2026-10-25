@@ -1,0 +1,19 @@
+{
+  "seed": 20261026,
+  "requested_mutations": 5000,
+  "requested_valid_zip_cases": 100,
+  "completed_cases": 5102,
+  "passed": true,
+  "sentinel_bearing_cases": 2152,
+  "invariants": {
+    "no_unexpected_exception": true,
+    "status_complete_consistent": true,
+    "input_unchanged": true,
+    "no_extraction_in_fixture_directory": true,
+    "no_sentinel_in_default_report": true
+  },
+  "benchmarks": [],
+  "limitation": "Prueba reproducible con datos sint\u00e9ticos; no demuestra seguridad exhaustiva.",
+  "duration_seconds": 6.265,
+  "supervised_duration_seconds": 6.422
+}

@@ -1,0 +1,124 @@
+{
+  "schema_version": "1.0",
+  "tool": {
+    "name": "PaqueteLupa",
+    "version": "0.2.0"
+  },
+  "status": "incomplete",
+  "complete": false,
+  "summary": {
+    "entries": 6,
+    "scanned_text_files": 5,
+    "skipped_files": 1,
+    "bytes_read": 217,
+    "findings": 6
+  },
+  "limits": {
+    "archive_bytes": 67108864,
+    "central_bytes": 2097152,
+    "entries": 2000,
+    "entry_bytes": 8388608,
+    "total_bytes": 33554432,
+    "ratio": 100,
+    "seconds": 20,
+    "findings": 500
+  },
+  "findings": [
+    {
+      "rule": "privacy.sensitive_name",
+      "severity": "medium",
+      "entry": "entrada-00002",
+      "line": null,
+      "message": "Nombre habitual de archivo con credenciales o claves.",
+      "remediation": "Revisar el paquete antes de compartirlo o extraerlo."
+    },
+    {
+      "rule": "path.unsafe",
+      "severity": "high",
+      "entry": "entrada-00003",
+      "line": null,
+      "message": "Ruta peligrosa o ambigua entre sistemas operativos.",
+      "remediation": "Revisar el paquete antes de compartirlo o extraerlo."
+    },
+    {
+      "rule": "path.collision",
+      "severity": "high",
+      "entry": "entrada-00005",
+      "line": null,
+      "message": "Entrada duplicada o colisi\u00f3n de nombres normalizados.",
+      "remediation": "Revisar el paquete antes de compartirlo o extraerlo."
+    },
+    {
+      "rule": "http-authorization",
+      "severity": "high",
+      "entry": "entrada-00001",
+      "line": 2,
+      "message": "Posible credencial de autenticaci\u00f3n HTTP Basic o Bearer.",
+      "remediation": "Retira los datos de autenticaci\u00f3n de cabeceras y registros."
+    },
+    {
+      "rule": "credential-assignment",
+      "severity": "medium",
+      "entry": "entrada-00002",
+      "line": 1,
+      "message": "Asignaci\u00f3n que puede contener una contrase\u00f1a, clave o token.",
+      "remediation": "Revisa el valor se\u00f1alado y sustit\u00fayelo por un marcador antes de compartir."
+    },
+    {
+      "rule": "coverage.content",
+      "severity": "medium",
+      "entry": "entrada-00006",
+      "line": null,
+      "message": "Contenido binario o codificaci\u00f3n no admitida.",
+      "remediation": "Revisar el paquete antes de compartirlo o extraerlo."
+    }
+  ],
+  "entries": [
+    {
+      "id": "entrada-00001",
+      "size": 89,
+      "compressed_size": 89,
+      "state": "scanned"
+    },
+    {
+      "id": "entrada-00002",
+      "size": 42,
+      "compressed_size": 42,
+      "state": "scanned"
+    },
+    {
+      "id": "entrada-00003",
+      "size": 32,
+      "compressed_size": 32,
+      "state": "scanned"
+    },
+    {
+      "id": "entrada-00004",
+      "size": 22,
+      "compressed_size": 22,
+      "state": "scanned"
+    },
+    {
+      "id": "entrada-00005",
+      "size": 21,
+      "compressed_size": 21,
+      "state": "scanned"
+    },
+    {
+      "id": "entrada-00006",
+      "size": 11,
+      "compressed_size": 11,
+      "state": "skipped"
+    }
+  ],
+  "notes": [
+    "Inspecci\u00f3n local: no extrae, ejecuta ni env\u00eda contenidos.",
+    "Sin hallazgos no significa seguro. Detecci\u00f3n por patrones; no es un antivirus ni una anonimizaci\u00f3n.",
+    "Nombres omitidos por privacidad; los identificadores siguen el orden del directorio central.",
+    "Se revisan texto, nombres y comentarios ZIP. Fechas y UID/GID reconocidos se validan estructuralmente; otros campos extra dejan cobertura incompleta."
+  ],
+  "archive": {
+    "sha256": "80b985536a568afc449cfeb85b24985eab45506767de2f1dd77d80a799d7e870",
+    "size_bytes": 897
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "seed": 20261025,
+  "requested_mutations": 5000,
+  "requested_valid_zip_cases": 100,
+  "completed_cases": 5104,
+  "passed": true,
+  "sentinel_bearing_cases": 2127,
+  "invariants": {
+    "no_unexpected_exception": true,
+    "status_complete_consistent": true,
+    "input_unchanged": true,
+    "no_extraction_in_fixture_directory": true,
+    "no_sentinel_in_default_report": true
+  },
+  "benchmarks": [
+    {
+      "duration_seconds": 2.906,
+      "status": "no_findings",
+      "complete": true,
+      "expanded_bytes": 8388608,
+      "archive_bytes": 8388736
+    },
+    {
+      "duration_seconds": 11.719,
+      "status": "no_findings",
+      "complete": true,
+      "expanded_bytes": 33554432,
+      "archive_bytes": 33554878
+    }
+  ],
+  "duration_seconds": 20.656,
+  "supervised_duration_seconds": 20.813,
+  "harness_checks": {
+    "exclusive_json_creation": true,
+    "existing_output_unchanged": true,
+    "supervisor_timeout_reported": true,
+    "timeout_duration_seconds": 0.032
+  },
+  "memory_followup": {
+    "seed": 20261025,
+    "requested_mutations": 10,
+    "requested_valid_zip_cases": 100,
+    "completed_cases": 114,
+    "passed": true,
+    "sentinel_bearing_cases": 42,
+    "supervised_duration_seconds": 15.125,
+    "benchmarks": [
+      {
+        "duration_seconds": 2.953,
+        "status": "no_findings",
+        "complete": true,
+        "peak_traced_python_bytes": 16806148,
+        "expanded_bytes": 8388608,
+        "archive_bytes": 8388736
+      },
+      {
+        "duration_seconds": 11.704,
+        "status": "no_findings",
+        "complete": true,
+        "peak_traced_python_bytes": 33586447,
+        "expanded_bytes": 33554432,
+        "archive_bytes": 33554878
+      }
+    ],
+    "measurement_scope": "tracemalloc mide asignaciones Python durante scan_file. Excluye RSS total, memoria nativa, inicio del interprete y creacion de fixtures."
+  },
+  "limitation": "Prueba reproducible con datos sinteticos; no demuestra seguridad exhaustiva. Los tiempos y la memoria corresponden a esta maquina y esta ejecucion."
+}

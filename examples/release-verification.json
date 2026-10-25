@@ -1,0 +1,13 @@
+{
+  "date": "2026-10-25",
+  "version": "0.1.0",
+  "python": "3.12.14",
+  "app_matches_tested_sources": true,
+  "reproducible_on_same_inputs_and_runtime": true,
+  "zip_crc_ok": true,
+  "packaged_exit_codes_checked": [0, 1, 2, 3],
+  "runs_from_another_working_directory": true,
+  "exclusive_outputs": true,
+  "synthetic_secret_absent_from_output": true,
+  "limitation": "La evidencia de empaquetado no certifica la seguridad de archivos inspeccionados."
+}

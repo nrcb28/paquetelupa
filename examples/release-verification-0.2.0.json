@@ -1,0 +1,18 @@
+{
+  "date": "2026-10-25",
+  "version": "0.2.0",
+  "reproducible": true,
+  "app_matches_tested_sources": true,
+  "zip_crc_ok": true,
+  "packaged_exit_codes": [
+    0,
+    1,
+    2,
+    3
+  ],
+  "exclusive_outputs": true,
+  "locator_checked": true,
+  "expected_sha256_guard_checked": true,
+  "source_manifest_only": true,
+  "python": "3.12.14"
+}
