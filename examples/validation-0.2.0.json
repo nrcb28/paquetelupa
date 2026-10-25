@@ -4,12 +4,12 @@
   "python": "3.12.14",
   "platform": "Windows",
   "tests": {
-    "run": 206,
-    "passed": 204,
+    "run": 208,
+    "passed": 206,
     "skipped": 2,
     "failures": 0,
     "errors": 0,
-    "duration_seconds": 17.234,
+    "duration_seconds": 15.515,
     "skipped_reasons": [
       "POSIX owner-only file permissions",
       "Creating symlinks is unavailable on this platform/account"
@@ -19,18 +19,19 @@
     "paquetelupa/__init__.py": "1da74e4b96ebd8c98e83692e16ac040c3d8720b9805de7959eb242ae2a39ea45",
     "paquetelupa/__main__.py": "5efcfdf5ee7872f12c82b50248a2693c0f52df934a6ab501b02d9d0b471362a8",
     "paquetelupa/detectors.py": "e9fcb634a8d08687a5dc397b4b7650aebd1b4ea9a773d016dab15c05a4fad930",
-    "paquetelupa/files.py": "27e925f836c2ed417247593ffde4e91e8c9bf7061b090fd78ea592440de61902",
+    "paquetelupa/files.py": "87d0023c21836573d27054bfaa35ea2342bfc06a1096efdccdbc66e5d0764e23",
     "paquetelupa/reports.py": "3e2002d48fe2c559f1f9002070f094923b5b1f07cebf0994bb710aa5d1769f1e",
     "paquetelupa/runtime.py": "b3c64d28b2aee503f8a2bfec174aab4fcaea982b73b3df20e3cb4530b0ba9849",
-    "paquetelupa/scanner.py": "2b99bb59c29b362d68f901038f8ef0a64a689e3435f84f94b22751b88f60abeb"
+    "paquetelupa/scanner.py": "e0a5100a2be68f1cb6766c20a13b1eff09b36be224ef7cef2300032a4b501cbd"
   },
   "fuzz_evidence": [
     "examples/fuzz-0.2.0-20261025.json",
-    "examples/fuzz-0.2.0-final-20261025.json"
+    "examples/fuzz-0.2.0-final-20261025.json",
+    "examples/fuzz-0.2.0-stability-20261025.json"
   ],
   "limitations": [
     "Datos sint\u00e9ticos; no certifica seguridad ni ausencia de secretos.",
-    "Python 3.12.14 en Windows; otros runtimes no ejecutados.",
+    "Este registro describe Python 3.12.14 local en Windows; consulte GitHub Actions para otros runtimes.",
     "Sin sandbox ni cuota estricta de memoria del sistema operativo.",
     "HTML comprobado autom\u00e1ticamente; vista previa local bloqueada por pol\u00edtica del navegador."
   ]

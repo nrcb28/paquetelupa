@@ -118,7 +118,7 @@
     "Se revisan texto, nombres y comentarios ZIP. Fechas y UID/GID reconocidos se validan estructuralmente; otros campos extra dejan cobertura incompleta."
   ],
   "archive": {
-    "sha256": "80b985536a568afc449cfeb85b24985eab45506767de2f1dd77d80a799d7e870",
+    "sha256": "7e1e53496aa844c791ccd878d74a8a32dde2a884ebbb0eade8d15427e6d79018",
     "size_bytes": 897
   }
 }

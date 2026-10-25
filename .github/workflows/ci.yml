@@ -2,6 +2,7 @@ name: Pruebas y seguridad
 
 on:
   push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
 

@@ -19,6 +19,7 @@
     "examples/demo-texto.zip",
     "examples/fuzz-0.2.0-20261025.json",
     "examples/fuzz-0.2.0-final-20261025.json",
+    "examples/fuzz-0.2.0-stability-20261025.json",
     "examples/fuzz-20261025.json",
     "examples/fuzz-final-20261025.json",
     "examples/fuzz-final-pathfix-20261025.json",
