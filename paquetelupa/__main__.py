@@ -78,24 +78,60 @@ def _timeout_report(limits):
                        "El informe no es un certificado de seguridad."])
 
 
+class ReportDestinationError(OSError):
+    """Only constant, non-sensitive output validation messages are allowed."""
+
+
+def validate_report_destinations(source, json_path=None, html_path=None):
+    """Reject predictable output errors before scanning, without creating files.
+
+    This is an early usability check, not a reservation. Exclusive creation and
+    path validation are still required when the reports are actually written.
+    """
+    paths = [Path(path) for path in (json_path, html_path) if path]
+    if not paths:
+        return
+    try:
+        # Reject Windows UNC/device inputs before resolve() can touch them.
+        validate_local_path(Path(source))
+        for path in paths:
+            validate_local_path(path)
+        resolved = [os.path.normcase(str(path.resolve())) for path in paths]
+        source_resolved = os.path.normcase(str(Path(source).resolve()))
+    except (OSError, ValueError, RuntimeError):
+        raise ReportDestinationError("La entrada o un destino no es una ruta local válida y accesible.") from None
+    if len(set(resolved)) != len(resolved) or source_resolved in resolved:
+        raise ReportDestinationError("Los destinos deben ser distintos entre sí y de la entrada.")
+    for path in paths:
+        try:
+            path.lstat()
+        except FileNotFoundError:
+            pass
+        except NotADirectoryError:
+            raise ReportDestinationError("La carpeta de un destino no existe o no es un directorio.") from None
+        else:
+            raise ReportDestinationError("Un destino de informe ya existe; elige un nombre nuevo.")
+        if not path.parent.is_dir():
+            raise ReportDestinationError("La carpeta de un destino no existe o no es un directorio.")
+
+
 def write_reports(report, source, json_path=None, html_path=None):
+    validate_report_destinations(source, json_path, html_path)
     destinations = []
     if json_path:
         destinations.append((Path(json_path), json.dumps(report, ensure_ascii=True, indent=2) + "\n"))
     if html_path:
         destinations.append((Path(html_path), render_html(report)))
-    for path, _ in destinations:
-        validate_local_path(path)
-    resolved = [path.resolve() for path, _ in destinations]
-    if len(set(os.path.normcase(str(p)) for p in resolved)) != len(resolved) or Path(source).resolve() in resolved:
-        raise OSError("Los destinos deben ser distintos entre sí y de la entrada.")
     # Reserve every destination before writing. 'x' never overwrites a file or link.
     opened = []
     try:
         with ExitStack() as stack:
             streams = []
             for path, data in destinations:
-                stream = stack.enter_context(open_private_output(path))
+                try:
+                    stream = stack.enter_context(open_private_output(path))
+                except FileExistsError:
+                    raise ReportDestinationError("Un destino de informe ya existe; elige un nombre nuevo.") from None
                 opened.append((path, os.fstat(stream.fileno())))
                 streams.append(stream)
             for stream, (_, data) in zip(streams, destinations):
@@ -115,11 +151,19 @@ def _remove_owned_empty(opened):
             pass
 
 
+_SAFE_ARGUMENT_ERRORS = frozenset({
+    "--timeout debe ser positivo, finito y no mayor que 20",
+    "La localización no admite HTML ni mostrar todos los nombres.",
+    "Identificador inválido. Usa el formato entrada-00001.",
+    "Huella inválida. Usa 64 caracteres hexadecimales para SHA-256.",
+})
+
+
 class _PrivateParser(argparse.ArgumentParser):
     def error(self, message):
         # argparse normally echoes invalid values (possibly filenames or secrets).
         self.print_usage(sys.stderr)
-        detail = (message if message == "--timeout debe ser positivo, finito y no mayor que 20"
+        detail = (message if message in _SAFE_ARGUMENT_ERRORS
                   else "Argumentos inválidos. Consulta --help; usa -- antes de un nombre que empiece por guion.")
         self.exit(2, "Error: " + detail + "\n")
 
@@ -129,6 +173,8 @@ def _parser():
     parser.add_argument("archive", help="archivo ZIP que quieres revisar")
     parser.add_argument("--json", dest="json_path", metavar="INFORME.json", help="crear informe JSON; el destino no debe existir")
     parser.add_argument("--html", dest="html_path", metavar="INFORME.html", help="crear informe HTML local; el destino no debe existir")
+    parser.add_argument("--format", dest="output_format", choices=("text", "json"), default="text",
+                        help="formato de salida estándar del análisis (por defecto: text); --locate siempre devuelve JSON")
     parser.add_argument("--show-paths", action="store_true", help="incluir nombres originales: pueden revelar información sensible")
     parser.add_argument("--locate", metavar="ENTRADA", help="localizar un único ID, p. ej. entrada-00001; revela solo ese nombre, sin extraer")
     parser.add_argument("--expect-sha256", metavar="HUELLA", help="comprobar que el ZIP coincide con el SHA-256 de un informe anterior")
@@ -146,14 +192,15 @@ def main(argv=None):
     if args.locate and (args.show_paths or args.html_path):
         parser.error("La localización no admite HTML ni mostrar todos los nombres.")
     if args.locate and not re.fullmatch(r"entrada-[0-9]{5}", args.locate):
-        parser.error("Identificador inválido.")
+        parser.error("Identificador inválido. Usa el formato entrada-00001.")
     if args.expect_sha256 and not re.fullmatch(r"[0-9a-fA-F]{64}", args.expect_sha256):
-        parser.error("Huella inválida.")
+        parser.error("Huella inválida. Usa 64 caracteres hexadecimales para SHA-256.")
     try:
         limits = replace(Limits(), seconds=args.timeout)
     except ValueError:
         parser.error("--timeout debe ser positivo, finito y no mayor que 20")
     try:
+        validate_report_destinations(args.archive, args.json_path, args.html_path)
         result = supervised_scan(args.archive, limits, args.show_paths, locate_id=args.locate, expected_sha256=args.expect_sha256)
         if "error" in result:
             print("Error: " + result["error"], file=sys.stderr)
@@ -165,10 +212,16 @@ def main(argv=None):
             return 0
         report = result["report"]
         write_reports(report, args.archive, args.json_path, args.html_path)
-        print(render_text(report))
+        if args.output_format == "json":
+            print(json.dumps(report, ensure_ascii=True, indent=2))
+        else:
+            print(render_text(report))
         return {"no_findings": 0, "review": 1, "incomplete": 2}[report["status"]]
     except KeyboardInterrupt:
         print("Análisis cancelado.", file=sys.stderr)
+        return 3
+    except ReportDestinationError as error:
+        print("Error: " + str(error), file=sys.stderr)
         return 3
     except (OSError, ValueError):
         print("Error: no se pudo crear el informe o iniciar el análisis. Los destinos deben ser nuevos y accesibles.", file=sys.stderr)

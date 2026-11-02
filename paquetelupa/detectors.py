@@ -51,14 +51,24 @@ def _placeholder(value: str) -> bool:
         return True
     if re.fullmatch(r"\{\{[ \t]{0,8}[A-Za-z_][A-Za-z0-9_.]{0,127}[ \t]{0,8}\}\}", value):
         return True
-    if lower.startswith(("$env:", "process.env.",
-                         "os.environ", "os.getenv(", "getenv(", "env(")):
-        return True
     if lower.startswith("$") and re.fullmatch(r"\$[A-Za-z_][A-Za-z0-9_]*", value):
         return True
     if re.fullmatch(r"%[A-Za-z_][A-Za-z0-9_]*%", value):
         return True
     return len(value) >= 4 and set(value) <= {"*"}
+
+
+# Code references are only ignored as complete, unquoted expressions. Checking
+# the source view is necessary because assignment captures stop at a quote in
+# os.getenv("NAME"). A quoted JSON value is always a literal, and calls with a
+# fallback or expressions with concatenation still require manual review.
+_ENVIRONMENT_REFERENCE = re.compile(
+    r'''(?:(?i:\$env):[A-Za-z_][A-Za-z0-9_]{0,127}'''
+    r'''|process\.env\.[A-Za-z_][A-Za-z0-9_]{0,127}'''
+    r'''|(?:process\.env|os\.environ)\[[ \t]{0,8}(?P<bracket_quote>["'])[A-Za-z_][A-Za-z0-9_]{0,127}(?P=bracket_quote)[ \t]{0,8}\]'''
+    r'''|(?:os\.getenv|os\.environ\.get|getenv|env)\([ \t]{0,8}(?P<call_quote>["'])[A-Za-z_][A-Za-z0-9_]{0,127}(?P=call_quote)[ \t]{0,8}\))'''
+    r'''[ \t]{0,16}(?=$|[,;#)\]}])'''
+)
 
 
 _RULES = (
@@ -105,7 +115,7 @@ _RULES = (
     ),
     _Rule(
         "database-url-password", "high",
-        re.compile(r'''(?i)\b(?:postgres(?:ql)?|mysql|mariadb|mongodb(?:\+srv)?|redis|rediss|amqp|amqps)://[^\s:/@'"]{1,128}:(?P<value>[^\s/@'"]{1,256})@'''),
+        re.compile(r'''(?i)\b(?:(?:postgres(?:ql)?|mysql|mariadb|mongodb(?:\+srv)?|amqp|amqps)://[^\s:/@'"]{1,128}|rediss?://[^\s:/@'"]{0,128}):(?P<value>[^\s/@'"]{1,256})@'''),
         "URL de servicio que incluye una contraseña.",
         "Elimina la contraseña de la URL y revisa si requiere rotación.", "value",
     ),
@@ -233,6 +243,8 @@ def scan_text(text: str, entry_id: str, limit: int = 100, *,
             for view in views:
                 for match in rule.pattern.finditer(view):
                     if rule.value_group and _placeholder(match.group(rule.value_group)):
+                        continue
+                    if rule.name == "credential-assignment" and _ENVIRONMENT_REFERENCE.match(view, match.start("value")):
                         continue
                     if rule.name == "http-authorization":
                         if _placeholder(match.group("basic") or match.group("bearer")):

@@ -93,6 +93,15 @@ class LocatorTests(unittest.TestCase):
         self.assertNotIn("first-secret-filename",result.stdout)
         self.assertEqual(self.invoke("--locate","entrada-00002","--json",output).returncode,3)
 
+    def test_explicit_json_stdout_format_preserves_locator_contract(self):
+        result = self.invoke("--locate", "entrada-00002", "--format", "json")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        location = json.loads(result.stdout)
+        self.assertEqual(location["operation"], "locate")
+        self.assertEqual(location["entry"]["path"], "second-private-filename.txt")
+        self.assertNotIn("status", location)
+        self.assertNotIn("first-secret-filename", result.stdout)
+
     def test_cli_wrong_fingerprint_is_private_failure(self):
         result = self.invoke("--locate","entrada-00001","--expect-sha256","0"*64)
         self.assertEqual(result.returncode,3)

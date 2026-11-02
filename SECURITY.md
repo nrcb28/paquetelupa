@@ -12,6 +12,8 @@ No se extraen miembros del ZIP al sistema de archivos, no se ejecutan programas 
 
 La salida contiene solo metadatos y consejos constantes. Los IDs ordinales permiten relacionar hallazgos con el orden central sin publicar nombres. `--show-paths` incluye todos los nombres internos por solicitud del usuario; `--locate` revela solo el nombre seleccionado. Ambos pueden revelar personas, proyectos o credenciales. Ni el nombre del ZIP de entrada ni los de los archivos de informe se insertan automáticamente como título del reporte.
 
+`--format json` aplica las mismas garantías de privacidad al informe de análisis enviado por salida estándar. Los motivos `reason_code` y `reason` de las entradas omitidas son constantes, no contienen excepciones arbitrarias ni datos del ZIP y se conservan independientemente del límite de hallazgos. Los errores de argumentos solo muestran instrucciones específicas de una lista de mensajes constantes; nunca incorporan los valores recibidos.
+
 En Windows se rechazan tanto para entrada como para salida los flujos alternativos ADS, dispositivos, nombres reservados, recursos UNC, rutas relativas a una unidad y nombres ambiguos. La comprobación de rutas y archivos regulares no aísla el acceso frente a carpetas padre, junctions o enlaces controlados por un proceso local hostil. Utiliza carpetas de confianza.
 
 ## Identidad del ZIP y localización privada
@@ -42,6 +44,8 @@ Solo se admite un subconjunto de ZIP clásico STORE/DEFLATE con coherencia entre
 HTML y texto no incluyen valores capturados por los detectores, líneas fuente ni huellas derivadas de esos valores; SHA-256 corresponde al ZIP completo. Por defecto omiten también los nombres; con `--show-paths`, los nombres originales sí pueden contener credenciales. El HTML escapa los datos, no usa JavaScript ni recursos externos y declara una política CSP restrictiva. El texto neutraliza controles de terminal y caracteres de dirección que podrían falsear su visualización. Los campos y filas de presentación están acotados; el JSON conserva el detalle del informe generado por el analizador.
 
 Las salidas se crean exclusivamente y deben ser archivos regulares nuevos, sin sobrescribir destinos existentes. Se usa modo `0600` en POSIX, restringido por cualquier umask más estricta; en Windows se heredan las ACL de la carpeta y no se impone una ACL privada adicional. La suite incluye una comprobación de permisos POSIX, omitida al ejecutarse en Windows; no debe interpretarse una ejecución Windows como validación de ese control en POSIX.
+
+La validación anticipada de destinos detecta errores previsibles antes de analizar y no reserva ni crea salidas. Se repite al escribir y se conserva `O_EXCL`: un archivo que aparezca después de esa comprobación tampoco se sobrescribe.
 
 Un fallo de escritura puede dejar un informe parcial: comprueba el código de salida y no interpretes ese archivo como una ejecución completa. Guarda las salidas en una carpeta de confianza; la herramienta no protege frente a modificaciones posteriores por otros procesos locales.
 

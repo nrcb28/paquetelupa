@@ -27,6 +27,10 @@ jobs:
           python-version: ${{ matrix.python }}
       - name: Ejecutar pruebas con datos sintéticos
         run: python -m unittest discover -s tests -v
+      - name: Construir artefactos reproducibles
+        run: python tools/build_release.py
+      - name: Verificar portable fuera del repositorio
+        run: python tools/verify_portable.py
       - name: Comprobar mutaciones acotadas
         if: matrix.os == 'ubuntu-latest' && matrix.python == '3.12'
         run: python tools/fuzz_smoke.py --seed 20261027 --cases 1000

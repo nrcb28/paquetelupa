@@ -38,6 +38,8 @@
     "tests/test_arguments.py",
     "tests/test_cli.py",
     "tests/test_compatibility.py",
+    "tests/test_coverage_reasons.py",
+    "tests/test_detection_corpus.py",
     "tests/test_detector_security_v011.py",
     "tests/test_detectors.py",
     "tests/test_locator.py",
@@ -48,6 +50,7 @@
     "tests/test_security_v011.py",
     "tools/build_release.py",
     "tools/create_demo.py",
-    "tools/fuzz_smoke.py"
+    "tools/fuzz_smoke.py",
+    "tools/verify_portable.py"
   ]
 }

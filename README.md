@@ -14,6 +14,16 @@ python -m paquetelupa archivo.zip --html informe.html --json informe.json
 
 La terminal muestra el resumen. El HTML se puede abrir directamente en un navegador y no utiliza JavaScript ni recursos externos. El JSON permite automatizar la revisión. Las salidas se crean de forma exclusiva: si un destino ya existe, el comando falla para evitar sobrescribirlo. Elige nombres nuevos para cada ejecución.
 
+Para recibir un único documento JSON por la salida estándar, sin crear archivos de informe:
+
+```console
+python -m paquetelupa archivo.zip --format json
+```
+
+`--format json` conserva los códigos de salida del análisis y puede combinarse con `--json` y `--html` para guardar copias. Los errores operativos se escriben en la salida de error y no generan un documento JSON de análisis. La salida predeterminada sigue siendo texto; `--locate` siempre devuelve JSON. Los nombres siguen ocultos salvo petición expresa.
+
+Antes de analizar se comprueban los errores previsibles de los destinos: nombres repetidos, coincidencia con la entrada, archivos ya existentes y carpetas que no existen. La comprobación no crea ni reserva archivos; al escribir se vuelve a validar y se mantiene la creación exclusiva.
+
 ```console
 python -m paquetelupa --help
 python -m paquetelupa archivo.zip
@@ -60,6 +70,8 @@ En modo `--locate`, `0` significa que se localizó la entrada solicitada; el JSO
 Los argumentos inválidos también devuelven `2`, mediante el parser de la CLI, sin generar un informe de análisis. Si automatizas el comando, comprueba que se haya creado el JSON esperado antes de interpretar su estado.
 
 El estado incompleto tiene prioridad sobre los hallazgos. `complete: true` solo expresa cobertura del alcance admitido; no significa que se hayan buscado todos los tipos de secretos ni inspeccionado todos los bytes del contenedor.
+
+Las entradas omitidas incluyen `reason_code` y `reason`: un código estable y una explicación sin contenido ni nombres originales. El motivo también aparece en HTML y texto, y se conserva por entrada aunque se alcance el límite de hallazgos. Así puedes identificar qué requiere revisión adicional sin depender de una lista de hallazgos truncada.
 
 Si aparece una credencial potencial:
 
@@ -119,3 +131,16 @@ python -m unittest discover -s tests -v
 ```
 
 Las pruebas emplean datos sintéticos; no requieren credenciales reales ni acceso a servicios externos.
+
+La comprobación de mutaciones incluye un corpus con detecciones esperadas, además de las invariantes de estructura, privacidad y estabilidad:
+
+```console
+python tools/fuzz_smoke.py --seed 20261027 --cases 1000
+```
+
+CI también construye y ejecuta el archivo portable desde fuera del proyecto en Windows y Ubuntu. Puedes repetir esa comprobación localmente:
+
+```console
+python tools/build_release.py
+python tools/verify_portable.py
+```
