@@ -1,5 +1,15 @@
 # Cambios
 
+## Sin publicar
+
+- Añadida salida estándar JSON mediante `--format json`, con los mismos códigos de salida y la misma omisión predeterminada de nombres y valores.
+- Comprobados los errores previsibles de los destinos antes de iniciar el análisis, sin crear archivos anticipadamente ni relajar la creación exclusiva al escribir.
+- Los errores de argumentos muestran instrucciones concretas cuando el mensaje es constante y seguro; los valores suministrados siguen sin reflejarse.
+- Las entradas omitidas conservan un código y motivo propios en JSON, HTML y texto, incluso cuando se trunca la lista de hallazgos o se interrumpe el análisis.
+- Corregida la detección de contraseñas en URLs Redis/Rediss con usuario vacío y la exclusión excesiva de literales y valores de respaldo que parecen referencias de entorno.
+- Añadido un corpus de detección con resultados esperados a las pruebas y al fuzz reproducible.
+- CI construye el `.pyz` y comprueba sus modos de análisis y localización desde fuera del árbol de fuentes, con entradas sintéticas y códigos de salida verificados.
+
 ## 0.2.0 — 25 de octubre de 2026
 
 - Añadida localización de una entrada por ID con `--locate`, revelando solo su nombre en JSON. No inspecciona el contenido ni extrae archivos; es incompatible con HTML y con la divulgación de todos los nombres.

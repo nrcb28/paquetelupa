@@ -34,6 +34,7 @@ _SENTINELS = (
 _INVARIANTS = (
     "no_unexpected_exception", "status_complete_consistent", "input_unchanged",
     "no_extraction_in_fixture_directory", "no_sentinel_in_default_report",
+    "detection_corpus_complete", "detection_corpus_findings",
 )
 
 
@@ -55,6 +56,64 @@ def _fixtures():
     ], compression=zipfile.ZIP_DEFLATED,
        comment=("password=" + _SENTINELS[2]).encode())
     return benign, sensitive
+
+
+def _detection_corpus():
+    """Fixed positive and negative oracles, separate from structural mutations.
+
+    Each expectation records (rule, entry, line), not secret material. Exact
+    matches catch lost detections, changed locations, and new false positives.
+    """
+    credential = _SENTINELS[0]
+    positives = (
+        ("private_key", "-----BEGIN ENCRYPTED PRIVATE KEY-----", "private-key"),
+        ("aws_id", "AKIA1234567890ABCDEF", "aws-access-id"),
+        ("github_token", "ghp_" + "aB7z" * 9, "github-token"),
+        ("stripe_key", "sk_live_" + "aB7z" * 8, "stripe-live-secret"),
+        ("assignment", "password=" + credential, "credential-assignment"),
+        ("quoted_assignment", 'password="two words ' + credential + '"', "credential-assignment"),
+        ("json_reference_literal", json.dumps({"password": "process.env." + credential}), "credential-assignment"),
+        ("json_call_literal", json.dumps({"password": "os.getenv(" + credential + ")"}), "credential-assignment"),
+        ("python_fallback", 'password=os.getenv("PASSWORD", "' + credential + '")', "credential-assignment"),
+        ("python_mapping_fallback", 'password=os.environ.get("PASSWORD", "' + credential + '")', "credential-assignment"),
+        ("javascript_fallback", 'password=process.env.PASSWORD || "' + credential + '"', "credential-assignment"),
+        ("basic_authorization", "Authorization: Basic dXNlcjpzeW50aGV0aWM=", "http-authorization"),
+        ("bearer_authorization", "Authorization: Bearer " + credential, "http-authorization"),
+        ("postgres_url", "postgresql://user:" + credential + "@db.invalid/db", "database-url-password"),
+        ("redis_without_user", "redis://:" + credential + "@cache.invalid/0", "database-url-password"),
+        ("rediss_without_user", "rediss://:" + credential + "@cache.invalid/0", "database-url-password"),
+        ("jwt", "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJzeW50aGV0aWMifQ.abcdefgh12345678", "jwt-shaped-value"),
+        ("ansi_assignment", "pass\x1b[31mword=" + credential, "credential-assignment"),
+        ("escaped_assignment", r"pass\u0077ord=" + credential, "credential-assignment"),
+    )
+    for label, text, rule in positives:
+        yield label, _zip([("fixture.txt", text.encode())]), {(rule, "entrada-00001", 1)}
+    yield "utf16_assignment", _zip([("fixture.txt", ("password=" + credential).encode("utf-16"))]), {
+        ("credential-assignment", "entrada-00001", 1)}
+    yield "mixed_line_locations", _zip([("fixture.txt", ("ordinary\r\npassword=" + credential + "\rsecret=" + credential).encode())]), {
+        ("credential-assignment", "entrada-00001", 2), ("credential-assignment", "entrada-00001", 3)}
+    yield "filename_assignment", _zip([("password=" + _SENTINELS[1] + ".txt", b"Synthetic information.")]), {
+        ("name.credential-assignment", "entrada-00001", None)}
+    yield "archive_comment_assignment", _zip([("fixture.txt", b"Synthetic information.")],
+                                               comment=("password=" + _SENTINELS[2]).encode()), {
+        ("comment.credential-assignment", None, 1)}
+    member = zipfile.ZipInfo("fixture.txt")
+    member.comment = ("password=" + _SENTINELS[2]).encode()
+    yield "entry_comment_assignment", _zip([(member, b"Synthetic information.")]), {
+        ("comment.credential-assignment", "entrada-00001", 1)}
+    negatives = (
+        ("ordinary_text", "Synthetic diagnostic information without credentials."),
+        ("empty_text", ""),
+        ("placeholders", 'password="<password>"\npassword=REDACTED\npassword=********'),
+        ("substitution_references", 'password="${PASSWORD}"\npassword=$PASSWORD\npassword=%PASSWORD%'),
+        ("code_references", 'password=process.env.PASSWORD\npassword=os.getenv("PASSWORD")\npassword=$env:PASSWORD'),
+        ("mapping_references", 'password=os.environ["PASSWORD"]\npassword=process.env["PASSWORD"]\npassword=os.environ.get("PASSWORD")'),
+        ("calls_without_fallback", 'password=getenv("PASSWORD")\npassword=env("PASSWORD")'),
+        ("redis_without_password", "redis://cache.invalid/0\nrediss://default:@cache.invalid/0\nredis://:@cache.invalid/0"),
+        ("provider_boundaries", "XAKIA1234567890ABCDEF\nghp_" + "a" * 37),
+    )
+    for label, text in negatives:
+        yield label, _zip([("fixture.txt", text.encode())]), set()
 
 
 def _mutate(source: bytes, rng: random.Random, ordinal: int):
@@ -139,7 +198,7 @@ class _InvariantFailure(Exception):
         self.exception_type = exception_type
 
 
-def _check(path, data, *, trace=False):
+def _check(path, data, *, trace=False, expected_findings=None):
     path.write_bytes(data)
     if trace:
         tracemalloc.start()
@@ -166,6 +225,13 @@ def _check(path, data, *, trace=False):
     # preserve the sensitive bytes. Assertions never echo a captured value.
     if any(sentinel in serialized for sentinel in _SENTINELS):
         raise _InvariantFailure("no_sentinel_in_default_report")
+    if expected_findings is not None:
+        if complete is not True:
+            raise _InvariantFailure("detection_corpus_complete")
+        actual = [(item.get("rule"), item.get("entry"), item.get("line"))
+                  for item in report.get("findings", [])]
+        if len(actual) != len(expected_findings) or set(actual) != expected_findings:
+            raise _InvariantFailure("detection_corpus_findings")
     metrics = {"duration_seconds": round(elapsed, 6), "status": status, "complete": complete}
     if trace:
         metrics["peak_traced_python_bytes"] = peak
@@ -175,11 +241,15 @@ def _check(path, data, *, trace=False):
 def _worker(config):
     started = time.monotonic()
     rng = random.Random(config["seed"])
+    corpus = list(_detection_corpus())
     result = {
         "seed": config["seed"], "requested_mutations": config["cases"],
         "requested_valid_zip_cases": 100, "completed_cases": 0, "passed": True,
         "sentinel_bearing_cases": 0,
         "invariants": dict.fromkeys(_INVARIANTS, True), "benchmarks": [],
+        "detection_corpus": {"requested_cases": len(corpus), "completed_cases": 0,
+                             "positive_cases": sum(bool(expected) for _, _, expected in corpus),
+                             "negative_cases": sum(not expected for _, _, expected in corpus)},
         "limitation": "Prueba reproducible con datos sintéticos; no demuestra seguridad exhaustiva.",
     }
     phase, ordinal, mutation = "baseline", 0, "none"
@@ -192,6 +262,12 @@ def _worker(config):
                 _check(path, fixture)
                 result["completed_cases"] += 1
                 result["sentinel_bearing_cases"] += int(any(value.encode() in fixture for value in _SENTINELS))
+            phase = "detection_corpus"
+            for ordinal, (mutation, data, expected) in enumerate(corpus):
+                _check(path, data, expected_findings=expected)
+                result["detection_corpus"]["completed_cases"] += 1
+                result["completed_cases"] += 1
+                result["sentinel_bearing_cases"] += int(any(value.encode() in data for value in _SENTINELS))
             phase = "mutation"
             for ordinal in range(config["cases"]):
                 data, mutation = _mutate(fixtures[rng.randrange(len(fixtures))], rng, ordinal)

@@ -48,6 +48,29 @@ class Rejected(Exception):
     """Only constant, non-sensitive messages may be passed here."""
 
 
+class _TimeBudgetExceeded(Rejected):
+    """Distinguish cooperative timeouts without inspecting exception text."""
+
+
+# Stable codes and constant explanations remain available even when findings
+# are truncated. Never derive these messages from archive bytes or exceptions.
+_SKIP_REASONS = {
+    "unexpected_directory_data": "Directorio con datos inesperados.",
+    "special_file": "No se inspecciona el destino de enlaces o archivos especiales.",
+    "directory_conflict": "Directorio ambiguo: se omite su contenido.",
+    "unsupported_flags": "Entrada cifrada o con opciones ZIP no admitidas.",
+    "unsupported_compression": "Método de compresión no admitido; solo STORE y DEFLATE.",
+    "entry_size_limit": "Entrada mayor que el límite de bytes por archivo.",
+    "compression_ratio_limit": "Relación de compresión excesiva: posible bomba ZIP.",
+    "total_size_limit": "Se ha alcanzado el presupuesto total de bytes.",
+    "nested_archive": "Archivo anidado: no se descomprime recursivamente.",
+    "unsupported_content": "Contenido binario o codificación no admitida.",
+    "archive_rejected": "Contenido sin revisar: estructura o datos ZIP no verificables.",
+    "analysis_aborted": "El análisis se interrumpió antes de revisar esta entrada.",
+    "analysis_timeout": "Contenido sin revisar: se agotó el presupuesto de tiempo.",
+}
+
+
 class IdentityMismatch(ValueError):
     """The archive is different from the expected report identity."""
 
@@ -277,7 +300,14 @@ def scan_file(path: str | Path, limits: Limits | None = None, show_paths: bool =
 
     def check():
         if time.monotonic() > deadline:
-            raise Rejected("Se ha agotado el presupuesto de tiempo.")
+            raise _TimeBudgetExceeded("Se ha agotado el presupuesto de tiempo.")
+
+    def skip(item, reason_code):
+        report["complete"] = False
+        if item["state"] != "skipped":
+            report["summary"]["skipped_files"] += 1
+        item.update(state="skipped", reason_code=reason_code,
+                    reason=_SKIP_REASONS[reason_code])
 
     def finding(rule, severity, message, entry=None, line=None, remediation="Revisar el paquete antes de compartirlo o extraerlo."):
         if len(report["findings"]) >= limits.findings:
@@ -288,11 +318,22 @@ def scan_file(path: str | Path, limits: Limits | None = None, show_paths: bool =
         report["findings"].append(dict(rule=rule, severity=severity, entry=entry, line=line,
                                        message=message, remediation=remediation))
 
+    current_item = None
     with open_regular_input(path) as (stream, before):
         try:
             report["archive"] = _fingerprint(stream, before.st_size, limits, check, expected_sha256)
             entries, archive_comment = _directory(stream, before.st_size, limits, check)
             report["summary"]["entries"] = len(entries)
+            # Retain every validated central entry if metadata inspection or a
+            # later payload aborts. Names stay absent unless explicitly asked for.
+            for entry in entries:
+                item = dict(id=entry["id"], size=entry["unpacked"],
+                            compressed_size=entry["compressed"], state="pending")
+                if show_paths:
+                    item["path"] = entry["name"]
+                entry["item"] = item
+                report["entries"].append(item)
+
             def scan_comment(data, eid):
                 if data:
                     text = decode_text(data)
@@ -311,11 +352,7 @@ def scan_file(path: str | Path, limits: Limits | None = None, show_paths: bool =
                 name = entry["name"]
                 directory = name.endswith("/")
                 unsafe, key = _path_info(name)
-                item = dict(id=eid, size=entry["unpacked"], compressed_size=entry["compressed"], state="pending")
-                if show_paths:
-                    item["path"] = name
-                report["entries"].append(item)
-                entry["item"] = item
+                current_item = entry["item"]
                 scan_comment(entry["comment"], eid)
                 if entry["opaque_extra"]:
                     report["complete"] = False
@@ -345,6 +382,7 @@ def scan_file(path: str | Path, limits: Limits | None = None, show_paths: bool =
                 # Names themselves can leak secrets; record only constant findings.
                 for hit in scan_text(name, eid, limit=limits.findings + 1, check=check):
                     finding("name."+hit["rule"], hit["severity"], "Posible credencial en el nombre de una entrada.", eid)
+            current_item = None
             for key, _, eid in keys:
                 check()
                 segments = key.split("/")
@@ -353,35 +391,34 @@ def scan_file(path: str | Path, limits: Limits | None = None, show_paths: bool =
             for entry in entries:
                 check()
                 item, eid = entry["item"], entry["id"]
-                reason = None
+                current_item = item
+                reason_code = None
                 allowed_flags = 0x808 | (6 if entry["method"] == 8 else 0)
                 if entry["name"].endswith("/") and entry["unpacked"] == 0 and not entry["special"] and not entry["directory_conflict"] and not entry["flags"] & ~allowed_flags and entry["method"] in (0, 8):
                     if entry["compressed"] not in (0, 2):
-                        reason = "Directorio con datos inesperados."
+                        reason_code = "unexpected_directory_data"
                     else:
                         # Validate directory streams too; do not hide invalid CRC or data.
                         _payload(stream, entry, limits.entry_bytes, check)
                         item["state"] = "directory"
                         continue
                 if entry["special"]:
-                    reason = "No se inspecciona el destino de enlaces o archivos especiales."
+                    reason_code = "special_file"
                 elif entry["directory_conflict"]:
-                    reason = "Directorio ambiguo: se omite su contenido."
+                    reason_code = "directory_conflict"
                 elif entry["flags"] & ~allowed_flags:
-                    reason = "Entrada cifrada o con opciones ZIP no admitidas."
+                    reason_code = "unsupported_flags"
                 elif entry["method"] not in (0, 8):
-                    reason = "Método de compresión no admitido; solo STORE y DEFLATE."
+                    reason_code = "unsupported_compression"
                 elif entry["unpacked"] > limits.entry_bytes:
-                    reason = "Entrada mayor que el límite de bytes por archivo."
+                    reason_code = "entry_size_limit"
                 elif entry["unpacked"] > max(1, entry["compressed"]) * limits.ratio:
-                    reason = "Relación de compresión excesiva: posible bomba ZIP."
+                    reason_code = "compression_ratio_limit"
                 elif entry["unpacked"] + report["summary"]["bytes_read"] > limits.total_bytes:
-                    reason = "Se ha alcanzado el presupuesto total de bytes."
-                if reason:
-                    report["complete"] = False
-                    item["state"] = "skipped"
-                    report["summary"]["skipped_files"] += 1
-                    finding("coverage.skipped", "medium", reason, eid)
+                    reason_code = "total_size_limit"
+                if reason_code:
+                    skip(item, reason_code)
+                    finding("coverage.skipped", "medium", item["reason"], eid)
                     continue
                 if entry["method"] == 0 and entry["compressed"] != entry["unpacked"]:
                     raise Rejected("Entrada STORE con tamaños incoherentes.")
@@ -390,20 +427,18 @@ def scan_file(path: str | Path, limits: Limits | None = None, show_paths: bool =
                 report["summary"]["bytes_read"] += len(data)
                 if data.startswith((b"PK\x03\x04", b"PK\x05\x06", b"PK\x07\x08", b"\x1f\x8b", b"7z\xbc\xaf\x27\x1c", b"Rar!", b"BZh", b"\xfd7zXZ")) or entry["name"].casefold().endswith((".zip", ".jar", ".docx", ".xlsx", ".pptx", ".gz", ".tar", ".7z", ".rar", ".bz2", ".xz")):
                     text = None
-                    reason = "Archivo anidado: no se descomprime recursivamente."
+                    reason_code = "nested_archive"
                 else:
                     text = decode_text(data)
-                    reason = "Contenido binario o codificación no admitida."
+                    reason_code = "unsupported_content"
                 if text is None:
-                    item["state"] = "skipped"
-                    report["complete"] = False
-                    report["summary"]["skipped_files"] += 1
-                    finding("coverage.content", "medium", reason, eid)
+                    skip(item, reason_code)
+                    finding("coverage.content", "medium", item["reason"], eid)
                 else:
-                    item["state"] = "scanned"
-                    report["summary"]["scanned_text_files"] += 1
                     for hit in scan_text(text, eid, limit=limits.findings+1, check=check):
                         finding(**hit)
+                    item["state"] = "scanned"
+                    report["summary"]["scanned_text_files"] += 1
                 check()
             after = os.fstat(stream.fileno())
             if (before.st_size, before.st_mtime_ns, before.st_ctime_ns) != (after.st_size, after.st_mtime_ns, after.st_ctime_ns):
@@ -419,8 +454,10 @@ def scan_file(path: str | Path, limits: Limits | None = None, show_paths: bool =
             finding("archive.rejected", "high", message)
             for item in report["entries"]:
                 if item["state"] == "pending":
-                    item["state"] = "skipped"
-                    report["summary"]["skipped_files"] += 1
+                    code = ("analysis_timeout" if isinstance(error, _TimeBudgetExceeded)
+                            else "archive_rejected" if item is current_item
+                            else "analysis_aborted")
+                    skip(item, code)
     if show_paths:
         report["notes"][2] = "Nombres incluidos por petición: pueden revelar información sensible."
     report["summary"]["findings"] = len(report["findings"])

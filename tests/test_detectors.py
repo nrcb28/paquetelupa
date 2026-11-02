@@ -39,10 +39,28 @@ class DetectorTests(unittest.TestCase):
         self.assertTrue(all(finding["entry"] == "entry-00002" for finding in findings))
 
     def test_placeholders_and_environment_references(self):
-        for value in ["changeme", "REDACTED", "*********", "${DB_PASSWORD}", "$PASSWORD", "%PASSWORD%", "process.env.PASSWORD", "os.getenv('PASSWORD')", "null", "<password>"]:
+        for value in ["changeme", "REDACTED", "*********", "${DB_PASSWORD}", "$PASSWORD", "%PASSWORD%", "process.env.PASSWORD", "os.getenv('PASSWORD')", "null", "<password>",
+                      "$env:PASSWORD", "$Env:PASSWORD", "$ENV:PASSWORD", 'process.env["PASSWORD"]', "os.environ['PASSWORD']",
+                      'os.environ.get("PASSWORD")', 'getenv("PASSWORD")', "env('PASSWORD')"]:
             with self.subTest(value=value):
                 self.assertNotIn("credential-assignment", self.rules("password=" + value))
         self.assertNotIn("aws-access-id", self.rules("AKIAIOSFODNN7EXAMPLE"))
+
+    def test_environment_references_in_containers_and_with_comments(self):
+        for text in ('{"password": os.getenv("PASSWORD")}',
+                     "connect(password=os.environ['PASSWORD'])",
+                     "password=process.env.PASSWORD;", "password=$env:PASSWORD # environment"):
+            with self.subTest(text=text):
+                self.assertEqual(self.rules(text), set())
+
+    def test_redis_urls_require_a_password_but_not_a_username(self):
+        for scheme in ("redis", "rediss"):
+            with self.subTest(scheme=scheme):
+                self.assertIn("database-url-password", self.rules(scheme + "://:syntheticCredential9@cache.invalid/0"))
+                self.assertIn("database-url-password", self.rules(scheme + "://default:syntheticCredential9@cache.invalid/0"))
+                self.assertEqual(self.rules(scheme + "://cache.invalid/0"), set())
+                self.assertEqual(self.rules(scheme + "://default:@cache.invalid/0"), set())
+                self.assertEqual(self.rules(scheme + "://:@cache.invalid/0"), set())
 
     def test_test_prefix_is_not_automatically_ignored(self):
         self.assertIn("credential-assignment", self.rules("password=test_abcd1234"))

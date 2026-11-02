@@ -71,6 +71,28 @@ class DetectorSecurityV011Tests(unittest.TestCase):
     def test_environment_default_value_is_not_an_empty_reference(self):
         self.assert_rule("password=${PASSWORD:-syntheticCredential9}", "credential-assignment")
 
+    def test_quoted_code_reference_prefixes_are_literal_passwords(self):
+        for value in ("process.env.syntheticCredential9", "os.getenv(syntheticCredential9)",
+                      "os.environ.syntheticCredential9", "getenv(syntheticCredential9)",
+                      "env(syntheticCredential9)", "$env:syntheticCredential9"):
+            with self.subTest(value=value):
+                self.assert_rule(json.dumps({"password": value}), "credential-assignment")
+
+    def test_environment_fallbacks_and_concatenations_are_not_pure_references(self):
+        for value in ('os.getenv("PASSWORD", "syntheticCredential9")',
+                      'os.environ.get("PASSWORD", "syntheticCredential9")',
+                      'getenv("PASSWORD", "syntheticCredential9")',
+                      'env("PASSWORD", "syntheticCredential9")',
+                      'process.env.PASSWORD || "syntheticCredential9"',
+                      'process.env.PASSWORD + "syntheticCredential9"',
+                      'os.getenv("PASSWORD") or "syntheticCredential9"',
+                      'os.environ["PASSWORD"] + "syntheticCredential9"'):
+            with self.subTest(value=value):
+                self.assert_rule("password=" + value, "credential-assignment")
+
+    def test_reference_in_one_assignment_does_not_hide_later_literal(self):
+        self.assert_rule('password=os.getenv("PASSWORD"); token="syntheticCredential9"', "credential-assignment")
+
     def test_normalized_findings_never_include_source_or_secret(self):
         sentinel = "SYNTHETIC_PRIVATE_PHRASE_7842"
         texts = [f'"password": "two words {sentinel}"',

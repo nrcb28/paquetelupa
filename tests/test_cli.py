@@ -175,6 +175,123 @@ class CLIIntegrationTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0)
         self.assertIn("PaqueteLupa", result.stdout)
 
+    def test_json_stdout_preserves_status_codes_and_privacy_without_output_files(self):
+        member = "private-member-831.txt"
+        for content, expected_status, expected_code in (
+            ("ordinary diagnostic note", "no_findings", 0),
+            ("password=" + SENTINEL, "review", 1),
+            (b"\x00unsupported binary", "incomplete", 2),
+        ):
+            with self.subTest(status=expected_status):
+                source = self.fixture(content, member=member)
+                before = set(self.root.iterdir())
+                result = self.invoke(source, "--format", "json")
+                report = json.loads(result.stdout)
+                self.assertEqual(result.returncode, expected_code, result.stderr)
+                self.assertEqual(report["status"], expected_status)
+                self.assertEqual(set(self.root.iterdir()), before)
+                self.assertNotIn("private-member", result.stdout)
+                self.assertNotIn("\x1b", result.stdout)
+                self.assertFalse(result.stderr)
+
+    def test_json_stdout_escapes_opt_in_filename_controls(self):
+        member = "requested-member-\x1b[31m\u202e.txt"
+        result = self.invoke(self.fixture(member=member), "--format", "json", "--show-paths")
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertEqual(json.loads(result.stdout)["entries"][0]["path"], member)
+        self.assertNotIn("\x1b", result.stdout)
+        self.assertNotIn("\u202e", result.stdout)
+        self.assertIn("\\u001b", result.stdout)
+
+    def test_json_stdout_matches_saved_json_and_can_also_create_html(self):
+        source = self.fixture("password=" + SENTINEL)
+        json_path, html_path = self.root / "result.json", self.root / "result.html"
+        result = self.invoke(source, "--format", "json", "--json", json_path, "--html", html_path)
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertEqual(json.loads(result.stdout), json.loads(json_path.read_text("utf-8")))
+        self.assertIn("<!doctype html>", html_path.read_text("utf-8").lower())
+
+    def test_json_stdout_operational_error_does_not_emit_a_fake_report(self):
+        result = self.invoke(self.root / (SENTINEL + ".zip"), "--format", "json")
+        self.assertEqual(result.returncode, 3)
+        self.assertEqual(result.stdout, "")
+        self.assertTrue(result.stderr)
+
+
+class OutputPreflightTests(unittest.TestCase):
+    def test_predictable_output_errors_do_not_start_scanning_or_create_files(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "source.zip"
+            source.write_bytes(b"source stays unchanged")
+            existing = root / "private-existing-report.json"
+            existing.write_bytes(b"existing stays unchanged")
+            new = root / "new-report.json"
+            for options, expected_message in (
+                (["--json", str(existing)], "ya existe"),
+                (["--html", str(existing)], "ya existe"),
+                (["--json", str(new), "--html", str(new)], "distintos"),
+                (["--json", str(source)], "distintos"),
+                (["--json", str(root / "missing" / "report.json")], "carpeta"),
+                (["--json", str(existing / "report.json")], "carpeta"),
+            ):
+                with self.subTest(options=options):
+                    before = set(root.iterdir())
+                    stderr = io.StringIO()
+                    with patch.object(cli, "supervised_scan") as scan, contextlib.redirect_stderr(stderr):
+                        code = cli.main([str(source), *options])
+                    self.assertEqual(code, 3)
+                    scan.assert_not_called()
+                    self.assertIn(expected_message, stderr.getvalue())
+                    self.assertNotIn(str(root), stderr.getvalue())
+                    self.assertEqual(set(root.iterdir()), before)
+                    self.assertEqual(existing.read_bytes(), b"existing stays unchanged")
+                    self.assertEqual(source.read_bytes(), b"source stays unchanged")
+
+    def test_output_created_after_preflight_is_never_overwritten(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source, destination = root / "source.zip", root / "report.json"
+            source.write_bytes(b"synthetic source")
+            def create_concurrent_output(*args, **kwargs):
+                destination.write_bytes(b"concurrent file stays unchanged")
+                return {"report": cli._timeout_report(Limits())}
+            with patch.object(cli, "supervised_scan", side_effect=create_concurrent_output), contextlib.redirect_stderr(io.StringIO()):
+                code = cli.main([str(source), "--json", str(destination)])
+            self.assertEqual(code, 3)
+            self.assertEqual(destination.read_bytes(), b"concurrent file stays unchanged")
+
+    def test_preflight_does_not_reserve_outputs_when_scan_fails(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            destination = Path(temporary) / "report.json"
+            with patch.object(cli, "supervised_scan", return_value={"error": "Error sintético seguro."}), contextlib.redirect_stderr(io.StringIO()):
+                code = cli.main(["synthetic.zip", "--json", str(destination)])
+            self.assertEqual(code, 3)
+            self.assertFalse(destination.exists())
+
+    def test_rejected_input_is_never_resolved_during_preflight(self):
+        source = Path("synthetic-rejected-device-or-network-path")
+        def reject_input(path):
+            if path == source:
+                raise OSError("Synthetic constant rejection.")
+        with patch.object(cli, "validate_local_path", side_effect=reject_input), \
+                patch.object(Path, "resolve", side_effect=AssertionError("Rejected paths must not be resolved")) as resolve:
+            with self.assertRaises(cli.ReportDestinationError):
+                cli.validate_report_destinations(source, "new-report.json")
+        resolve.assert_not_called()
+
+    def test_exclusive_creation_still_rejects_a_file_appearing_after_validation(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            destination = Path(temporary) / "report.json"
+            original_open = cli.open_private_output
+            def racing_open(path):
+                path.write_bytes(b"concurrent file stays unchanged")
+                return original_open(path)
+            with patch.object(cli, "open_private_output", side_effect=racing_open):
+                with self.assertRaises(OSError):
+                    cli.write_reports({}, "synthetic.zip", json_path=destination)
+            self.assertEqual(destination.read_bytes(), b"concurrent file stays unchanged")
+
 
 class FakeReader:
     def __init__(self, ready=True, data=b'{"report": {"status": "no_findings"}}', error=None, interrupt=False):

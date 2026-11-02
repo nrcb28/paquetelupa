@@ -147,6 +147,38 @@ class ReportsTests(unittest.TestCase):
         self.assertIn("Análisis incompleto", render_text(report))
         self.assertIn("Análisis incompleto", render_html(report))
 
+    def test_skipped_reason_is_visible_without_a_finding(self):
+        report = report_fixture()
+        report.update(status="incomplete", complete=False, findings=[])
+        reason = "Archivo anidado: no se descomprime recursivamente."
+        report["entries"][0].update(state="skipped", reason_code="nested_archive", reason=reason)
+        self.assertIn("motivo: " + reason, render_text(report))
+        self.assertIn("Motivo de omisión", render_html(report))
+        self.assertIn(reason, render_html(report))
+
+    def test_skipped_reason_is_escaped_and_bounded(self):
+        report = report_fixture()
+        report["entries"][0].update(state="skipped", reason_code="unsupported_content",
+                                     reason="<script>\x1b[2J\nforged\u202e" + "X" * 1000)
+        text = render_text(report)
+        document = render_html(report)
+        for rendered in (text, document):
+            self.assertNotIn("\x1b", rendered)
+            self.assertNotIn("\nforged", rendered)
+            self.assertNotIn("\u202e", rendered)
+            self.assertNotIn("X" * 401, rendered)
+            self.assertIn("[truncado]", rendered)
+        parsed = Tags()
+        parsed.feed(document)
+        self.assertNotIn("script", parsed.tags)
+        self.assertIn("&lt;script&gt;", document)
+
+    def test_legacy_skipped_entry_has_an_explicit_missing_reason(self):
+        report = report_fixture()
+        report["entries"][0]["state"] = "skipped"
+        for rendered in (render_text(report), render_html(report)):
+            self.assertIn("Motivo no disponible en este informe.", rendered)
+
     def test_no_findings_still_explains_limits(self):
         report = report_fixture()
         report.update(status="no_findings", findings=[])

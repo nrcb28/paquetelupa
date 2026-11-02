@@ -119,6 +119,8 @@ def render_text(report: dict) -> str:
         row += " | " + _display(item.get("size"), 30) + " bytes"
         if "path" in item:
             row += " | ruta: " + _display(item.get("path"), 240)
+        if item.get("state") == "skipped":
+            row += " | motivo: " + _display(item.get("reason", "Motivo no disponible en este informe."), 400)
         lines.append(row)
     if not entries:
         lines.append("Sin entradas disponibles.")
@@ -173,11 +175,14 @@ def render_html(report: dict) -> str:
         item = _mapping(raw)
         entry_rows.append('<tr><td><code>' + _html(item.get("id"), 160) + '</code></td>'
                           + ('<td class="path">' + _html(item.get("path"), 400) + '</td>' if show_paths else '')
-                          + '<td>' + _html(item.get("state"), 100) + '</td><td>' + _html(item.get("size"), 30)
+                          + '<td>' + _html(item.get("state"), 100) + '</td><td>'
+                          + (_html(item.get("reason", "Motivo no disponible en este informe."), 400)
+                             if item.get("state") == "skipped" else '—')
+                          + '</td><td>' + _html(item.get("size"), 30)
                           + '</td><td>' + _html(item.get("compressed_size"), 30) + '</td></tr>')
     entries_body = ('<div class="table-wrap"><table><thead><tr><th>Entrada</th>'
                     + ('<th>Ruta solicitada</th>' if show_paths else '')
-                    + '<th>Estado</th><th>Bytes declarados</th><th>Bytes comprimidos</th></tr></thead><tbody>'
+                    + '<th>Estado</th><th>Motivo de omisión</th><th>Bytes declarados</th><th>Bytes comprimidos</th></tr></thead><tbody>'
                     + "".join(entry_rows) + '</tbody></table></div>') if entry_rows else '<p class="empty">Sin entradas disponibles.</p>'
     if len(entries) > MAX_ROWS:
         entries_body += '<p class="warning">Se omiten filas por el límite de presentación. Consulta el JSON.</p>'
